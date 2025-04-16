@@ -81,48 +81,56 @@ export function BiomarkerHeatmap({ biomarkerType, ageRange, diseaseFilter }: Bio
     ]
   }
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+// Add these improvements to your visualization components
 
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+// Enhanced Heatmap Rendering
+useEffect(() => {
+  const renderHeatmap = () => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
 
-    const { biomarkers, diseases, data } = generateHeatmapData()
+    // Performance optimization
+    const pixelRatio = window.devicePixelRatio || 1;
+    const canvas = canvasRef.current;
+    const { width, height } = canvas.getBoundingClientRect();
+    
+    canvas.width = width * pixelRatio;
+    canvas.height = height * pixelRatio;
+    ctx.scale(pixelRatio, pixelRatio);
 
-    // Set canvas dimensions
-    canvas.width = Math.max(diseases.length * 100 + 150, 600)
-    canvas.height = Math.max(biomarkers.length * 40 + 100, 400)
+    // Memoize expensive calculations
+    const { biomarkers, diseases, data } = useMemo(
+      () => generateHeatmapData(),
+      [biomarkerType, diseaseFilter]
+    );
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Improved color scale
+    const colorScale = (value: number) => {
+      const hue = value > 0 ? 0 : 240; // Red for positive, blue for negative
+      const lightness = 50 - Math.abs(value) * 30;
+      return `hsl(${hue}, 100%, ${lightness}%)`;
+    };
 
-    // Draw heatmap
-    const cellWidth = (canvas.width - 150) / diseases.length
-    const cellHeight = (canvas.height - 100) / biomarkers.length
+    // Add tooltip interaction
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Find hovered cell and show tooltip
+      // Implement tooltip logic here
+    };
 
-    // Draw labels
-    ctx.font = "12px Arial"
-    ctx.textAlign = "right"
-    ctx.textBaseline = "middle"
+    canvas.addEventListener('mousemove', handleMouseMove);
+    return () => canvas.removeEventListener('mousemove', handleMouseMove);
+  };
 
-    // Draw biomarker labels (y-axis)
-    for (let i = 0; i < biomarkers.length; i++) {
-      ctx.fillStyle = "#000"
-      ctx.fillText(biomarkers[i], 140, 50 + i * cellHeight + cellHeight / 2)
-    }
-
-    // Draw disease labels (x-axis)
-    ctx.textAlign = "center"
-    ctx.textBaseline = "top"
-    for (let j = 0; j < diseases.length; j++) {
-      ctx.fillStyle = "#000"
-      ctx.save()
-      ctx.translate(150 + j * cellWidth + cellWidth / 2, 50 + biomarkers.length * cellHeight + 10)
-      ctx.rotate(-Math.PI / 4)
-      ctx.fillText(diseases[j], 0, 0)
-      ctx.restore()
-    }
+  const resizeObserver = new ResizeObserver(renderHeatmap);
+  resizeObserver.observe(canvasRef.current);
+  return () => resizeObserver.disconnect();
+}, [biomarkerType, ageRange, diseaseFilter]);
+  
 
     // Draw cells
     for (let i = 0; i < biomarkers.length; i++) {
